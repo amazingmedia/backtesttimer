@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="my" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Backtest Tracker - Pomodoro Timer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for Myanmar Text & Modern UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Padauk:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            dark: '#0F172A',
+                            card: '#1E293B',
+                            accent: '#06B6D4', // Cyan
+                            emerald: '#10B981', // Green
+                            amber: '#F59E0B',
+                            rose: '#F43F5E'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Padauk', 'Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['Plus Jakarta Sans', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0B0F19;
+            color: #F8FAFC;
+            font-family: 'Padauk', 'Plus Jakarta Sans', sans-serif;
+        }
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .custom-glow-emerald {
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
+        }
+        .custom-glow-cyan {
+            box-shadow: 0 0 25px rgba(6, 182, 212, 0.25);
+        }
+        .custom-glow-amber {
+            box-shadow: 0 0 25px rgba(245, 158, 11, 0.25);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-4 md:p-8 selection:bg-cyan-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="max-w-5xl mx-auto w-full flex justify-between items-center mb-6">
+        <div class="flex items-center gap-3">
+            <div class="p-2.5 bg-gradient-to-tr from-cyan-600 to-emerald-500 rounded-xl text-white shadow-lg">
+                <i class="fa-solid me-0 fa-chart-line text-xl md:text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold tracking-wide text-white">Backtest Hour Tracker</h1>
+                <p class="text-xs text-slate-400">Pomodoro နည်းစနစ်ဖြင့် Backtest မှတ်တမ်းယူစနစ်</p>
+            </div>
+        </div>
+        <div class="text-right">
+            <span id="currentDateDisplay" class="text-xs md:text-sm text-cyan-400 font-semibold bg-cyan-950/60 border border-cyan-800/50 px-3 py-1.5 rounded-full">
+                <!-- Current Date -->
+            </span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-5xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
+
+        <!-- Left Column: Timer & Controls (7 Cols) -->
+        <section class="lg:col-span-7 flex flex-col gap-6">
+            
+            <!-- Main Timer Card -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 md:p-8 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl backdrop-blur-sm" id="timerCard">
+                
+                <!-- Status Badge -->
+                <div class="mb-4">
+                    <span id="sessionStatusBadge" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="sessionStatusText">Backtest လုပ်ရန် အဆင်သင့်</span>
+                    </span>
+                </div>
+
+                <!-- Circular Progress & Clock -->
+                <div class="relative my-4 flex items-center justify-center">
+                    <svg class="w-64 h-64 md:w-80 md:h-80">
+                        <!-- Background Circle -->
+                        <circle class="text-slate-800" stroke-width="12" stroke="currentColor" fill="transparent" r="120" cx="50%" cy="50%"/>
+                        <!-- Animated Progress Circle -->
+                        <circle id="progressCircle" class="progress-ring-circle text-emerald-500" stroke-width="12" stroke-linecap="round" stroke="currentColor" fill="transparent" r="120" cx="50%" cy="50%" stroke-dasharray="753.98" stroke-dashoffset="0"/>
+                    </svg>
+
+                    <!-- Central Time Display -->
+                    <div class="absolute flex flex-col items-center justify-center text-center">
+                        <span id="timeDisplay" class="font-mono text-5xl md:text-6xl font-extrabold tracking-wider text-white">25:00</span>
+                        <span id="cycleCountDisplay" class="text-xs md:text-sm text-slate-400 mt-2 font-medium">
+                            ယနေ့ Session: <span class="text-cyan-400 font-bold" id="completedSessionsToday">0</span>
+                        </span>
+                        <span id="nextBreakInfo" class="text-[11px] text-slate-500 mt-0.5">
+                            (3 ကြိမ်ပြည့်ပါက မိနစ် 30 နားမည်)
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Timer Controls -->
+                <div class="flex flex-wrap items-center justify-center gap-3 mt-4 w-full max-w-md">
+                    <!-- Start/Pause Button -->
+                    <button id="startPauseBtn" onclick="toggleTimer()" class="flex-1 min-w-[130px] py-3 px-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                        <i id="startPauseIcon" class="fa-solid fa-play"></i>
+                        <span id="startPauseText">စမည်</span>
+                    </button>
+
+                    <!-- Reset Button -->
+                    <button onclick="resetTimer()" class="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700 transition-all active:scale-95 flex items-center justify-center gap-2" title="ပြန်စမည်">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        <span class="hidden sm:inline">ပြန်စမည်</span>
+                    </button>
+
+                    <!-- Skip Break Button (Hidden during work) -->
+                    <button id="skipBreakBtn" onclick="skipBreak()" class="hidden py-3 px-4 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 font-semibold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-forward-step"></i>
+                        <span>အနားချိန်ကျော်မည်</span>
+                    </button>
+                </div>
+
+                <!-- Test Audio Button -->
+                <div class="mt-4">
+                    <button onclick="testSound()" class="text-xs text-slate-400 hover:text-cyan-400 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-volume-high text-cyan-400"></i> အသံ စမ်းသပ်ရန်
+                    </button>
+                </div>
+
+                <!-- Rule Reminder Footer -->
+                <p class="text-[11px] text-slate-500 mt-4 text-center">
+                    <i class="fa-solid fa-circle-info text-cyan-500 me-1"></i> အနားယူချိန် (Break times) များကို Backtest စုစုပေါင်းအချိန်ထဲသို့ မထည့်တွက်ပါ။
+                </p>
+            </div>
+
+        </section>
+
+        <!-- Right Column: Stats & Logs (5 Cols) -->
+        <section class="lg:col-span-5 flex flex-col gap-6">
+
+            <!-- Today Summary Cards -->
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Today Hours Card -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-lg relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 text-emerald-500/10 text-6xl">
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                    <span class="text-xs text-slate-400 font-medium">ဒီနေ့ Backtest အချိန်</span>
+                    <div class="mt-3">
+                        <h2 id="todayTotalTime" class="text-xl md:text-2xl font-bold text-emerald-400 font-mono">0 နာရီ 0 မိနစ်</h2>
+                        <p class="text-[11px] text-slate-500 mt-1" id="todaySessionsSummary">0 Sessions ပြည့်ပြီး</p>
+                    </div>
+                </div>
+
+                <!-- Total Cumulative Card -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-lg relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 text-cyan-500/10 text-6xl">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+                    <span class="text-xs text-slate-400 font-medium">စုစုပေါင်း (All Time)</span>
+                    <div class="mt-3">
+                        <h2 id="allTimeTotalTime" class="text-xl md:text-2xl font-bold text-cyan-400 font-mono">0 နာရီ 0 မိနစ်</h2>
+                        <p class="text-[11px] text-slate-500 mt-1" id="totalDaysTracked">0 ရက် မှတ်တမ်းရှိ</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Logs Container -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex-grow flex flex-col shadow-lg">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <h3 class="font-bold text-slate-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-days text-cyan-400"></i>
+                        ရက်အလိုက် Backtest မှတ်တမ်းများ
+                    </h3>
+                    <button onclick="confirmClearHistory()" class="text-xs text-rose-400 hover:text-rose-300 hover:underline flex items-center gap-1 transition-all">
+                        <i class="fa-solid fa-trash-can"></i> မှတ်တမ်းဖျက်မည်
+                    </button>
+                </div>
+
+                <!-- History Table / Scroll Area -->
+                <div class="mt-3 overflow-y-auto max-h-[320px] pr-1 space-y-2" id="historyList">
+                    <!-- Dynamic Log Items Inserted Here -->
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Modal Notification / Alert Custom -->
+    <div id="customModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+            <div id="modalIcon" class="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h3 id="modalTitle" class="text-lg font-bold text-white mb-2">ခေါင်းစဉ်</h3>
+            <p id="modalMessage" class="text-sm text-slate-300 mb-6">သတင်းအချက်အလက် စာသား</p>
+            <div class="flex gap-2 justify-center" id="modalActions">
+                <button onclick="closeModal()" class="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl transition-all">
+                    လက်ခံသည်
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // --- CONSTANTS & CONFIGURATIONS ---
+        const WORK_TIME = 25 * 60;       // 25 mins in seconds
+        const SHORT_BREAK = 5 * 60;      // 5 mins in seconds
+        const LONG_BREAK = 30 * 60;      // 30 mins in seconds
+        const CIRCLE_RADIUS = 120;
+        const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
+
+        // Mode States: 'WORK', 'SHORT_BREAK', 'LONG_BREAK'
+        let currentMode = 'WORK';
+        let timeLeft = WORK_TIME;
+        let isRunning = false;
+        
+        // Accurate Time Tracking variables (Timestamp based)
+        let targetEndTime = null;
+
+        // Session Trackers for current day
+        let workSessionsCountToday = 0; // Cumulative successful sessions today
+
+        // Storage Key
+        const STORAGE_KEY = 'bt_pomodoro_tracker_logs_v1';
+
+        // --- WEB WORKER FOR UNTHROTTLED BACKGROUND TIMER ---
+        // Inline Web Worker blob to guarantee exact 1-second ticks even in background tabs
+        const workerBlob = new Blob([`
+            let timerId = null;
+            self.onmessage = function(e) {
+                if (e.data === 'start') {
+                    if (timerId) clearInterval(timerId);
+                    timerId = setInterval(function() {
+                        self.postMessage('tick');
+                    }, 1000);
+                } else if (e.data === 'stop') {
+                    if (timerId) clearInterval(timerId);
+                    timerId = null;
+                }
+            };
+        `], { type: 'application/javascript' });
+        
+        const timerWorker = new Worker(URL.createObjectURL(workerBlob));
+
+        timerWorker.onmessage = function(e) {
+            if (e.data === 'tick' && isRunning) {
+                const now = Date.now();
+                const remaining = Math.max(0, Math.round((targetEndTime - now) / 1000));
+                
+                timeLeft = remaining;
+                updateTimerDisplay();
+
+                if (timeLeft <= 0) {
+                    handleTimerCompletion();
+                }
+            }
+        };
+
+        // --- HYBRID AUDIO PLAYER (Local File + Web Audio Synthesizer Fallback) ---
+        let audioContextInstance = null;
+
+        function getAudioContext() {
+            if (!audioContextInstance) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    audioContextInstance = new AudioContext();
+                }
+            }
+            if (audioContextInstance && audioContextInstance.state === 'suspended') {
+                audioContextInstance.resume();
+            }
+            return audioContextInstance;
+        }
+
+        function playSynthesizedBeep() {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+
+                // Play 3 distinct pleasant chime tones (High Pitch Alarm)
+                const now = ctx.currentTime;
+                
+                // Sound 1: 523.25Hz (C5)
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(523.25, now);
+                gain1.gain.setValueAtTime(0.4, now);
+                gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.4);
+
+                // Sound 2: 659.25Hz (E5)
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(659.25, now + 0.2);
+                gain2.gain.setValueAtTime(0.4, now + 0.2);
+                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(now + 0.2);
+                osc2.stop(now + 0.6);
+
+                // Sound 3: 880.00Hz (A5)
+                const osc3 = ctx.createOscillator();
+                const gain3 = ctx.createGain();
+                osc3.type = 'sine';
+                osc3.frequency.setValueAtTime(880, now + 0.4);
+                gain3.gain.setValueAtTime(0.5, now + 0.4);
+                gain3.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
+                osc3.connect(gain3);
+                gain3.connect(ctx.destination);
+                osc3.start(now + 0.4);
+                osc3.stop(now + 1.2);
+            } catch (e) {
+                console.log('Synthesized audio error:', e);
+            }
+        }
+
+        function playSoundNotification() {
+            // First try local alarm.mp3
+            const audio = new Audio('alarm.mp3');
+            audio.play().then(() => {
+                // If local file played successfully, also trigger synth for extra richness
+            }).catch(err => {
+                console.log('local alarm.mp3 not found or blocked, falling back to Web Audio Synthesizer:', err);
+                playSynthesizedBeep();
+            });
+
+            // Always trigger synthesizer chime as well to ensure audio sounds even if local file doesn't exist
+            playSynthesizedBeep();
+        }
+
+        function testSound() {
+            playSoundNotification();
+        }
+
+        // --- APP INITIALIZATION ---
+        window.onload = function() {
+            displayCurrentDate();
+            loadTodayData();
+            updateTimerDisplay();
+            renderHistoryLogs();
+            setupProgressCircle();
+
+            // Page Visibility API fallback check
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden && isRunning && targetEndTime) {
+                    const now = Date.now();
+                    timeLeft = Math.max(0, Math.round((targetEndTime - now) / 1000));
+                    updateTimerDisplay();
+                    if (timeLeft <= 0) {
+                        handleTimerCompletion();
+                    }
+                }
+            });
+        };
+
+        // Format today's date string (YYYY-MM-DD)
+        function getTodayDateString() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        function displayCurrentDate() {
+            const today = new Date();
+            const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+            document.getElementById('currentDateDisplay').innerText = today.toLocaleDateString('my-MM', options);
+        }
+
+        function setupProgressCircle() {
+            const circle = document.getElementById('progressCircle');
+            circle.style.strokeDasharray = `${CIRCLE_CIRCUMFERENCE} ${CIRCLE_CIRCUMFERENCE}`;
+            circle.style.strokeDashoffset = 0;
+        }
+
+        function updateProgressCircle() {
+            const circle = document.getElementById('progressCircle');
+            let totalSeconds = WORK_TIME;
+            if (currentMode === 'SHORT_BREAK') totalSeconds = SHORT_BREAK;
+            if (currentMode === 'LONG_BREAK') totalSeconds = LONG_BREAK;
+
+            const progress = timeLeft / totalSeconds;
+            const offset = CIRCLE_CIRCUMFERENCE - (progress * CIRCLE_CIRCUMFERENCE);
+            circle.style.strokeDashoffset = offset;
+        }
+
+        // --- TIMER CORE FUNCTIONS ---
+        function toggleTimer() {
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            if (isRunning) return;
+            isRunning = true;
+
+            // Ensure AudioContext is initialized on user click interaction
+            getAudioContext();
+
+            // Set precise target end timestamp
+            targetEndTime = Date.now() + (timeLeft * 1000);
+
+            // Start Web Worker tick
+            timerWorker.postMessage('start');
+
+            // UI Update
+            document.getElementById('startPauseText').innerText = 'ခေတ္တရပ်မည်';
+            document.getElementById('startPauseIcon').className = 'fa-solid fa-pause';
+            document.getElementById('startPauseBtn').className = 'flex-1 min-w-[130px] py-3 px-6 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded-xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2';
+        }
+
+        function pauseTimer() {
+            if (!isRunning) return;
+            isRunning = false;
+
+            // Stop Web Worker tick
+            timerWorker.postMessage('stop');
+
+            // Save remaining time accurately
+            if (targetEndTime) {
+                timeLeft = Math.max(0, Math.round((targetEndTime - Date.now()) / 1000));
+            }
+
+            // UI Update
+            document.getElementById('startPauseText').innerText = 'ဆက်လုပ်မည်';
+            document.getElementById('startPauseIcon').className = 'fa-solid fa-play';
+            document.getElementById('startPauseBtn').className = 'flex-1 min-w-[130px] py-3 px-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2';
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            if (currentMode === 'WORK') timeLeft = WORK_TIME;
+            else if (currentMode === 'SHORT_BREAK') timeLeft = SHORT_BREAK;
+            else if (currentMode === 'LONG_BREAK') timeLeft = LONG_BREAK;
+
+            targetEndTime = null;
+            document.getElementById('startPauseText').innerText = 'စမည်';
+            document.getElementById('startPauseIcon').className = 'fa-solid fa-play';
+            updateTimerDisplay();
+        }
+
+        function skipBreak() {
+            if (currentMode !== 'WORK') {
+                pauseTimer();
+                switchToWorkMode();
+            }
+        }
+
+        // --- TIMER LOGIC SWITCHING & COMPLETION ---
+        function handleTimerCompletion() {
+            pauseTimer();
+
+            // Always trigger sound on completion
+            playSoundNotification();
+
+            if (currentMode === 'WORK') {
+                // Completed 25 mins Work Session
+                workSessionsCountToday++;
+                
+                // Save Backtest time (25 mins per session)
+                saveSessionProgress(25);
+
+                // Determine next break type (After 3 work sessions, 4th rest is long break)
+                if (workSessionsCountToday % 4 === 0) {
+                    switchToBreakMode('LONG_BREAK');
+                    showCustomModal(
+                        'မိနစ် ၃၀ အနားယူချိန် ရောက်ပါပြီ!',
+                        'Backtest 4 ကြိမ် ပြုလုပ်ပြီးပါပြီ။ ခေတ္တခဏ ဦးနှောက်အနားပေးလိုက်ပါ။',
+                        'fa-mug-hot',
+                        'text-amber-400',
+                        'bg-amber-500/20'
+                    );
+                } else {
+                    switchToBreakMode('SHORT_BREAK');
+                    showCustomModal(
+                        '၅ မိနစ် ခေတ္တနားချိန်!',
+                        'Backtest ၁ ကြိမ် (၂၅ မိနစ်) ပြီးဆုံးပါပြီ။ ၅ မိနစ် ခေတ္တနားယူပါ။',
+                        'fa-coffee',
+                        'text-cyan-400',
+                        'bg-cyan-500/20'
+                    );
+                }
+            } else {
+                // Break completed
+                switchToWorkMode();
+                showCustomModal(
+                    'နားချိန် ပြီးဆုံးပါပြီ!',
+                    'Backtest ကို ဆက်လက်ပြုလုပ်နိုင်ပါပြီ။ စတင်ရန် "စမည်" ကို နှိပ်ပါ။',
+                    'fa-bolt',
+                    'text-emerald-400',
+                    'bg-emerald-500/20'
+                );
+            }
+        }
+
+        function switchToWorkMode() {
+            currentMode = 'WORK';
+            timeLeft = WORK_TIME;
+            targetEndTime = null;
+
+            // UI Adjustments
+            document.getElementById('sessionStatusText').innerText = 'Backtest လုပ်နေသည်';
+            document.getElementById('sessionStatusBadge').className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30';
+            document.getElementById('progressCircle').className = 'progress-ring-circle text-emerald-500';
+            document.getElementById('skipBreakBtn').classList.add('hidden');
+            
+            document.getElementById('startPauseText').innerText = 'စမည်';
+            document.getElementById('startPauseIcon').className = 'fa-solid fa-play';
+
+            updateTimerDisplay();
+        }
+
+        function switchToBreakMode(breakType) {
+            currentMode = breakType;
+            timeLeft = (breakType === 'LONG_BREAK') ? LONG_BREAK : SHORT_BREAK;
+            targetEndTime = null;
+
+            const statusText = (breakType === 'LONG_BREAK') ? '၃၀ မိနစ် အနားယူချိန်' : '၅ မိနစ် ခေတ္တနားချိန်';
+            document.getElementById('sessionStatusText').innerText = statusText;
+            document.getElementById('sessionStatusBadge').className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30';
+            document.getElementById('progressCircle').className = 'progress-ring-circle text-amber-500';
+            document.getElementById('skipBreakBtn').classList.remove('hidden');
+
+            document.getElementById('startPauseText').innerText = 'နားချိန်စမည်';
+            document.getElementById('startPauseIcon').className = 'fa-solid fa-play';
+
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            
+            document.getElementById('timeDisplay').innerText = formattedTime;
+            document.title = `(${formattedTime}) Backtest Hour Tracker`;
+
+            document.getElementById('completedSessionsToday').innerText = workSessionsCountToday;
+
+            updateProgressCircle();
+        }
+
+        // --- LOCAL STORAGE & DATA MANAGEMENT ---
+        function getLogsFromStorage() {
+            const logs = localStorage.getItem(STORAGE_KEY);
+            return logs ? JSON.parse(logs) : {};
+        }
+
+        function saveSessionProgress(minutesToAdd) {
+            const todayStr = getTodayDateString();
+            const logs = getLogsFromStorage();
+
+            if (!logs[todayStr]) {
+                logs[todayStr] = {
+                    minutes: 0,
+                    sessions: 0
+                };
+            }
+
+            logs[todayStr].minutes += minutesToAdd;
+            logs[todayStr].sessions = workSessionsCountToday;
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+
+            // Refresh UI Stats
+            loadTodayData();
+            renderHistoryLogs();
+        }
+
+        function loadTodayData() {
+            const todayStr = getTodayDateString();
+            const logs = getLogsFromStorage();
+
+            if (logs[todayStr]) {
+                const totalMinutes = logs[todayStr].minutes || 0;
+                workSessionsCountToday = logs[todayStr].sessions || 0;
+
+                const hrs = Math.floor(totalMinutes / 60);
+                const mins = totalMinutes % 60;
+                document.getElementById('todayTotalTime').innerText = `${hrs} နာရီ ${mins} မိနစ်`;
+                document.getElementById('todaySessionsSummary').innerText = `${workSessionsCountToday} Sessions ပြည့်ပြီး`;
+            } else {
+                workSessionsCountToday = 0;
+                document.getElementById('todayTotalTime').innerText = `0 နာရီ 0 မိနစ်`;
+                document.getElementById('todaySessionsSummary').innerText = `0 Sessions ပြည့်ပြီး`;
+            }
+
+            // Calculate All-Time Totals
+            let allTimeMinutes = 0;
+            let daysCount = Object.keys(logs).length;
+
+            for (let date in logs) {
+                allTimeMinutes += logs[date].minutes || 0;
+            }
+
+            const allHrs = Math.floor(allTimeMinutes / 60);
+            const allMins = allTimeMinutes % 60;
+            document.getElementById('allTimeTotalTime').innerText = `${allHrs} နာရီ ${allMins} မိနစ်`;
+            document.getElementById('totalDaysTracked').innerText = `${daysCount} ရက် မှတ်တမ်းရှိ`;
+
+            document.getElementById('completedSessionsToday').innerText = workSessionsCountToday;
+        }
+
+        function renderHistoryLogs() {
+            const logs = getLogsFromStorage();
+            const historyListContainer = document.getElementById('historyList');
+            historyListContainer.innerHTML = '';
+
+            const sortedDates = Object.keys(logs).sort().reverse();
+
+            if (sortedDates.length === 0) {
+                historyListContainer.innerHTML = `
+                    <div class="text-center py-8 text-slate-500 text-xs">
+                        <i class="fa-solid fa-folder-open text-2xl mb-2 block"></i>
+                        မှတ်တမ်းများ မရှိသေးပါ။ Backtest စတင်ပြုလုပ်ပါ။
+                    </div>
+                `;
+                return;
+            }
+
+            sortedDates.forEach(date => {
+                const item = logs[date];
+                const hrs = Math.floor(item.minutes / 60);
+                const mins = item.minutes % 60;
+
+                const isToday = (date === getTodayDateString());
+
+                const div = document.createElement('div');
+                div.className = `flex items-center justify-between p-3 rounded-xl border ${isToday ? 'bg-cyan-950/30 border-cyan-800/50' : 'bg-slate-800/40 border-slate-800'} transition-all`;
+                
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg ${isToday ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-700/50 text-slate-400'} flex items-center justify-center text-xs font-bold">
+                            <i class="fa-solid fa-calendar-day"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs font-semibold ${isToday ? 'text-cyan-300' : 'text-slate-300'} block">
+                                ${date} ${isToday ? '<span class="text-[10px] text-emerald-400 font-normal ml-1">(ဒီနေ့)</span>' : ''}
+                            </span>
+                            <span class="text-[11px] text-slate-500">${item.sessions || 0} Sessions</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-bold text-emerald-400 font-mono">${hrs} နာရီ ${mins} မိနစ်</span>
+                    </div>
+                `;
+
+                historyListContainer.appendChild(div);
+            });
+        }
+
+        function confirmClearHistory() {
+            if (confirm('မှတ်တမ်းအားလုံးကို ဖျက်ရန် သေချာပါသလား?')) {
+                localStorage.removeItem(STORAGE_KEY);
+                workSessionsCountToday = 0;
+                resetTimer();
+                loadTodayData();
+                renderHistoryLogs();
+            }
+        }
+
+        // --- CUSTOM MODAL UTILITY ---
+        function showCustomModal(title, message, iconClass = 'fa-check', iconColor = 'text-emerald-400', iconBg = 'bg-emerald-500/20') {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerText = message;
+            
+            const iconContainer = document.getElementById('modalIcon');
+            iconContainer.className = `w-12 h-12 rounded-full ${iconBg} ${iconColor} flex items-center justify-center mx-auto mb-4 text-xl`;
+            iconContainer.innerHTML = `<i class="fa-solid ${iconClass}"></i>`;
+
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('customModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
